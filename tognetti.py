@@ -234,7 +234,7 @@ def plotter(plotter_pipe, controller_pipe):
         ax.set_xlim((650,1000))
         ax.set_ylim((-500,500))
         ax.set_xlabel("wavelength (nm)")
-        ax.set_ylabel("GDD (fs$^2$)")
+        ax.set_ylabel("total GDD (fs$^2$)")
         ax.set_title("1b", loc="left", y=.85, weight="bold")
 
         ax = fig.add_subplot(111)
@@ -262,8 +262,8 @@ def plotter(plotter_pipe, controller_pipe):
         ax.set_xlabel("round-trip")
         ax.set_ylabel("intracavity power")
 
-        Anu_max = 0.6e-10
-        At_max = 1513*1.3
+        Anu_max = 0.8e-10
+        At_max = 2.3e3
 
         positions = [
             ([.524,.74, .07, .09], [.524,.867, .07, .09], "5a"),
@@ -320,76 +320,77 @@ def plotter(plotter_pipe, controller_pipe):
 
   plt.show()
 
-Anu = 4e-15 * np.exp(-(nu_env/26e12)**2) * np.exp(-1j*(nu_env/15e12)**2)
-Anu_init = Anu.copy()
+if __name__=="__main__":
+  Anu = 4e-15 * np.exp(-(nu_env/26e12)**2) * np.exp(-1j*(nu_env/15e12)**2)
+  Anu_init = Anu.copy()
 
-plot_pipe, plotter_pipe = multiprocessing.Pipe()
-control_pipe, controller_pipe = multiprocessing.Pipe()
-plotter_process = multiprocessing.Process(target=plotter, args=(plotter_pipe,controller_pipe), daemon=True)
-plotter_process.start()
-print("started")
+  plot_pipe, plotter_pipe = multiprocessing.Pipe()
+  control_pipe, controller_pipe = multiprocessing.Pipe()
+  plotter_process = multiprocessing.Process(target=plotter, args=(plotter_pipe,controller_pipe), daemon=True)
+  plotter_process.start()
+  print("started")
 
-pwrs = [0]*500
-for i in itertools.count():
-  Anu_, Anus, peakints1, peakints2 = roundtrip(nu, Anu)
-  pwr = np.sum(abs(Anu_)**2)
-  if running: Anu = Anu_
+  pwrs = [0]*500
+  for i in itertools.count():
+    Anu_, Anus, peakints1, peakints2 = roundtrip(nu, Anu)
+    pwr = np.sum(abs(Anu_)**2)
+    if running: Anu = Anu_
 
-  pwrs = pwrs[1:]+[pwr]
+    pwrs = pwrs[1:]+[pwr]
 
-  if i%10==0: print(i)
+    if i%10==0: print(i)
 
-  if i%50==0:
-    print("sending")
-    plot_pipe.send(("plot", i,np.array(Anus), peakints1, peakints2, np.array(pwrs), gain_sapphire, phase_sapphire, loss_prismarm, phase_prismarm, loss_OCarm, phase_OCarm))
-    print("sent")
+    if i%50==0:
+      print("sending")
+      plot_pipe.send(("plot", i,np.array(Anus), peakints1, peakints2, np.array(pwrs), gain_sapphire, phase_sapphire, loss_prismarm, phase_prismarm, loss_OCarm, phase_OCarm))
+      print("sent")
 
-    while control_pipe.poll():
-      command = control_pipe.recv()
+      while control_pipe.poll():
+        command = control_pipe.recv()
 
-      if command=="sam_on": 
-        SAM = True
-      elif command=="sam_off": 
-        SAM = False
+        if command=="sam_on":
+          SAM = True
+        elif command=="sam_off":
+          SAM = False
 
-      elif command=="M_on": 
-        modulation = True
-      elif command=="M_off": 
-        modulation = False
+        elif command=="M_on":
+          modulation = True
+        elif command=="M_off":
+          modulation = False
 
-      elif command=="syn_on": 
-        synchronization = True
-      elif command=="syn_off": 
-        synchronization = False
+        elif command=="syn_on":
+          synchronization = True
+        elif command=="syn_off":
+          synchronization = False
 
-      elif command=="gain+": 
-        gain_sapphire *= 1.002
-      elif command=="gain-": 
-        gain_sapphire /= 1.002
+        elif command=="gain+":
+          gain_sapphire *= 1.002
+        elif command=="gain-":
+          gain_sapphire /= 1.002
 
-      elif command=="gdd+": 
-        phase_prismarm += gdd_to_phase(nu, 5e-30)
-      elif command=="gdd-": 
-        phase_prismarm += gdd_to_phase(nu, -5e-30)
+        elif command=="gdd+":
+          phase_prismarm += gdd_to_phase(nu, 5e-30)
+        elif command=="gdd-":
+          phase_prismarm += gdd_to_phase(nu, -5e-30)
 
-      elif command=="gdd2+": 
-        phase_OCarm += gdd_to_phase(nu, 5e-30)
-      elif command=="gdd2-": 
-        phase_OCarm -= gdd_to_phase(nu, 5e-30)
+        elif command=="gdd2+":
+          phase_OCarm += gdd_to_phase(nu, 5e-30)
+        elif command=="gdd2-":
+          phase_OCarm -= gdd_to_phase(nu, 5e-30)
 
-      elif command=="start": 
-        running = True
-      elif command=="stop": 
-        running = False
+        elif command=="start":
+          running = True
+        elif command=="stop":
+          running = False
 
-      elif command=="init": 
-        Anu = Anu_init
-      elif command=="init_lp": 
-        Anu = Anu_init * 0.01
-      else:
-        raise ValueError("unknown command {}".format(command))
+        elif command=="init":
+          Anu = Anu_init
+        elif command=="init_lp":
+          Anu = Anu_init * 0.01
+        else:
+          raise ValueError("unknown command {}".format(command))
 
-      print("{} executed".format(command))
+        print("{} executed".format(command))
 
-print("finished")
-plotter_process.join()
+  print("finished")
+  plotter_process.join()

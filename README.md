@@ -6,7 +6,7 @@ Follows M. V. Tognetti, M. N. Miranda, and H. M. Crespo, "*Dispersion-managed mo
 
 Dependencies: only numpy, scipy and matplotlib.
 
-Only tested on Ubuntu Linux. It uses the multiprocessing module for plotting and might need changes to run on Windows.
+Tested on Ubuntu Linux and Windows.
 
 Screenshot:
 
